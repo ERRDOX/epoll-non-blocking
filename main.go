@@ -23,7 +23,7 @@ func createNonBlockingSocket() (int, error) {
 		return 0, fmt.Errorf("error setting non-blocking mode: %v", err)
 	}
 
-	addr := &syscall.SockaddrInet4{Port: 8001}
+	addr := &syscall.SockaddrInet4{Port: 8000}
 	copy(addr.Addr[:], []byte{0, 0, 0, 0})
 	err = syscall.Bind(serverFd, addr)
 	if err != nil {
@@ -67,9 +67,8 @@ func main() {
 	events := make([]syscall.EpollEvent, 3)
 
 	for {
-		// epollwait: Waits for events on the epoll file descriptor.
+		// epollWait: Waits for events on the epoll file descriptor.
 		n, err := syscall.EpollWait(epollFd, events, -1)
-		println("n is : ", n)
 		if err != nil {
 			fmt.Println("Error waiting for epoll events:", err)
 			return
@@ -116,8 +115,6 @@ func main() {
 
 func handleClientEvent(fd, epollFd int) {
 	buf := make([]byte, 1024)
-	println("fd is: ", fd)
-	println("epollfd is: ", epollFd)
 
 	n, err := syscall.Read(fd, buf)
 	if err != nil {
