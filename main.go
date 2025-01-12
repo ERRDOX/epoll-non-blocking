@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"strings"
 	"syscall"
 )
 
@@ -71,7 +72,7 @@ func main() {
 		n, err := syscall.EpollWait(epollFd, events, -1)
 		if err != nil {
 			fmt.Println("Error waiting for epoll events:", err)
-			return
+			continue
 		}
 		for i := 0; i < n; i++ {
 			fd := int(events[i].Fd)
@@ -86,7 +87,7 @@ func main() {
 				// 1. get new connection and
 				// 2.set it to non-blocking
 				// 3.add it to epoll list with EPOLL_CTL_ADD
-				fmt.Println("New connection on server socket")
+				fmt.Printf("New connection on server socket on fd:%d\n", serverFd)
 				clientFd, _, err := syscall.Accept(serverFd)
 				if err != nil {
 					fmt.Println("Error accepting connection:", err)
@@ -128,6 +129,39 @@ func handleClientEvent(fd, epollFd int) {
 	responseString := fmt.Sprintf("Response from server to client with fd : %d !\n", fd)
 	responsebyte := []byte(responseString)
 	_, err = syscall.Write(fd, responsebyte)
+	if err != nil {
+		fmt.Println("Error writing to socket:", err)
+		syscall.Close(fd)
+		syscall.EpollCtl(epollFd, syscall.EPOLL_CTL_DEL, fd, nil)
+		return
+	}
+}
+
+func handleHttpClientEvent(fd, epollFd int) {
+	buf := make([]byte, 1024)
+
+	n, err := syscall.Read(fd, buf)
+	if err != nil {
+		fmt.Println("Error reading from socket:", err)
+		syscall.Close(fd)
+		syscall.EpollCtl(epollFd, syscall.EPOLL_CTL_DEL, fd, nil)
+		return
+	}
+
+	request := string(buf[:n])
+	if !strings.HasPrefix(request, "GET ") || !strings.Contains(request, "HTTP/1.1") {
+		errorMessage := "HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\n\r\n"
+		syscall.Write(fd, []byte(errorMessage))
+		syscall.Close(fd)
+		syscall.EpollCtl(epollFd, syscall.EPOLL_CTL_DEL, fd, nil)
+		return
+	}
+
+	fmt.Printf("Received %d bytes from client: %s\n", n, buf[:n])
+	responseMessage := "Response from server to client with fd: %d!\n"
+	responseString := fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Length: %d\r\n\r\n"+responseMessage, len(responseMessage), fd)
+	responseBytes := []byte(responseString)
+	_, err = syscall.Write(fd, responseBytes)
 	if err != nil {
 		fmt.Println("Error writing to socket:", err)
 		syscall.Close(fd)
