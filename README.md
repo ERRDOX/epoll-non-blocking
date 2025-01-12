@@ -1,4 +1,4 @@
-# Epoll Non-Blocking Socket Example
+# Non-Blocking Socket Example
 
 ## Problem
 Bring up a socket in non-blocking mode and listen to its events using a notification system like epoll or io_uring, and perform read and write operations. If we increase the number of sockets, will it become more complex? More complex but not efficient.
